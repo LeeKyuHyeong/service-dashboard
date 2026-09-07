@@ -102,6 +102,41 @@ button {
   }
 }
 
+/* 통합(프로젝트) 카드는 개수가 적어도 어색하지 않게 가운데 정렬 + 상한 폭 */
+.grid--projects {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 380px));
+  justify-content: center;
+}
+
+/* ===== Tabs ===== */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  margin-bottom: -1px;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+}
+
+.tab--active {
+  color: var(--text-primary);
+  border-bottom-color: var(--color-accent);
+}
+
 /* ===== Page Header ===== */
 .page-header {
   display: flex;
@@ -383,7 +418,6 @@ button {
 
 /* ===== Project Card ===== */
 .project-card {
-  cursor: pointer;
   overflow: hidden;
   padding: 0;
   display: flex;
@@ -393,6 +427,18 @@ button {
 .project-card:hover {
   transform: translateY(-2px);
   background: var(--bg-card-hover);
+}
+
+.project-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.project-card__header .project-card__name {
+  margin-bottom: 0;
 }
 
 .project-card__thumbnail {
@@ -437,11 +483,29 @@ button {
   color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 1rem;
-  flex: 1;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.project-card__actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 1.25rem;
+}
+
+.project-card__actions .btn {
+  flex: 1;
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+/* 통합 카드에서 상태 지표 블록은 태그와 액션 사이 간격만 정리 */
+.project-card .service-card__metrics {
+  margin-top: 1rem;
+  margin-bottom: 0;
 }
 
 /* ===== Tags ===== */
