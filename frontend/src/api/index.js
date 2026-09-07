@@ -18,7 +18,11 @@ export async function fetchLogs(containerName, tail = 100) {
   // HTML 을 로그 창에 그대로 뿌리지 않고 정책 안내로 바꾼다.
   const isPlainText = (res.headers.get('content-type') || '').includes('text/plain')
   if (!res.ok && !isPlainText) {
-    return '이 서버의 컨테이너 로그는 서버에서 직접 조회하도록 차단돼 있습니다. (docker logs <컨테이너명>)'
+    return [
+      '🔒 보안 정책상 컨테이너 로그는 외부에 노출하지 않습니다.',
+      '무인증 공개 API로 로그 전문을 반환할 수 없어, 호스트(nginx) 레벨에서 차단했습니다.',
+      '(운영자는 서버에서 `docker logs <컨테이너명>` 로 직접 확인)',
+    ].join('\n')
   }
   return res.text()
 }
