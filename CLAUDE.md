@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Portfolio Dashboard
 
 ## 프로젝트 개요
@@ -30,13 +34,52 @@ ITSM 숨김: `project.visible=false`(프로젝트 카드 제외) + `application.
 
 ---
 
+## 개발 · 빌드 · 배포
+
+**단일 아티팩트 구조 (핵심)**: 프론트(Vite)와 백엔드(Spring Boot)는 배포 시 **하나의 jar**로 합쳐진다. `Dockerfile` 멀티스테이지가 프론트를 빌드해 `dist` 를 백엔드 `src/main/resources/static` 에 복사한 뒤 `bootJar` 로 패키징 → 운영에선 Spring Boot 하나가 **8080에서 SPA와 `/api` 를 같은 오리진으로** 서빙한다(별도 웹서버·CORS 불필요). Docker 상태는 docker-java 가 아니라 **docker CLI 서브프로세스**(`ProcessBuilder`)로 조회한다(런타임 이미지에 `docker-cli` 설치).
+
+### 로컬 개발
+
+프론트/백엔드를 따로 띄운다. 프론트 dev 서버가 `/api` 를 `localhost:8080` 으로 프록시한다(`frontend/vite.config.js`).
+
+```bash
+# 백엔드 — backend/ (H2 인메모리 + seed 자동 적재, dev 프로필 필수)
+./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# 프론트 — frontend/ (Vite dev, :5173)
+npm install   # 최초 1회
+npm run dev
+```
+
+- **기본(prod) 프로필**은 MariaDB(`localhost:3306`)에 붙고 seed 를 실행하지 않는다(`spring.sql.init.mode: never`). 로컬은 반드시 `dev`(H2)로 띄울 것.
+
+### 빌드 · 린트 · 테스트
+
+```bash
+# 프론트 — frontend/
+npm run build     # dist 생성
+npm run lint      # eslint
+
+# 백엔드 — backend/
+./gradlew build   # 컴파일(+테스트)
+./gradlew bootJar # 실행 jar → build/libs/*.jar
+./gradlew test    # 테스트 (⚠️ 현재 테스트 코드 없음)
+```
+
+### 배포 (CI/CD)
+
+`main` 에 **push 하면 곧 배포**다. `.github/workflows/deploy.yml` 이 이미지 빌드 → Docker Hub push → VPS SSH 접속 후 `docker compose pull/up -d dashboard` → `/api/monitoring/health/self` 폴링으로 기동 확인까지 자동 수행한다. 상세 인프라·트러블슈팅은 `D:\server-infra.md`(SSOT).
+
+---
+
 ## 화면 설계
 
-### 메인 페이지 (`/`)
+### 메인 페이지 (`/`) — 탭 2개
 
-1. **Service status** — 서비스별 카드 3개 (상태 뱃지, Docker 상태, 업타임, 로그 보기 버튼)
-2. **Server metrics** — CPU, Memory, Disk 메트릭 카드 3개
-3. **Projects** — 프로젝트 카드 그리드 (썸네일 + 이름 + 설명 + 기술 태그), 클릭 시 상세 페이지 이동
+1. **프로젝트 탭** — 프로젝트당 **통합 카드 1개**. 프로젝트 소개(썸네일/이름/설명/기술 태그)와 라이브 상태(상태 뱃지/Docker/가동시간/로그 버튼)를 합쳐서 보여주고 `[상세 →]` 로 상세 페이지 이동.
+2. **서버 메트릭 탭** — CPU / Memory / Disk 카드 3개.
+
+> 서비스 상태와 프로젝트는 같은 대상(Song Quiz/Account)이라 카드를 하나로 통합했다. SSE 서비스 상태(`projectSlug`)와 프로젝트(`slug`)를 **slug 기준으로 join** 한다. 상태가 없는 프로젝트는 뱃지·로그 버튼을 자동으로 숨긴다.
 
 ### 상세 페이지 (`/projects/:slug`)
 
@@ -136,11 +179,10 @@ GET /api/monitoring/logs/{containerName}?tail=100
 
 ```
 App (React Router)
-├── MainPage (/)
-│   ├── ServiceCard ×3 (상태 뱃지, Docker 상태, 업타임, 로그 버튼)
-│   ├── MetricCard ×3 (CPU, Memory, Disk)
-│   ├── ProjectCard ×3 (썸네일, 이름, 설명, 태그)
-│   └── LogModal (로그 보기 클릭 시 표시)
+├── MainPage (/)                      # 탭: [프로젝트] [서버 메트릭]
+│   ├── ProjectCard ×N               # 통합 카드 = 프로젝트 소개 + 라이브 상태(slug join)
+│   │   └── LogModal                 # 카드의 '로그' 클릭 시. nginx 차단이면 안내 문구
+│   └── MetricCard ×3 (CPU, Memory, Disk)
 │
 └── ProjectDetailPage (/projects/:slug)
     ├── ProjectHeader (이름, 설명, demo/github 링크)
