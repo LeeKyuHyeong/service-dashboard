@@ -38,12 +38,13 @@ services:
       - itsm_backend
 
   db:
-    image: mariadb:11
+    image: mariadb:11.8
     container_name: dashboard-db
     environment:
       - TZ=Asia/Seoul
       - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-changeme}
       - MYSQL_DATABASE=dashboard
+      - MARIADB_AUTO_UPGRADE="1"
     # localhost 전용 (2026-07-24, DB 포트 전면 노출 사고 예방) — 외부는 SSH 터널로
     ports:
       - "127.0.0.1:3306:3306"
