@@ -42,6 +42,9 @@ public class Project {
     @Column(name = "sort_order")
     private Integer sortOrder;
 
+    @Column(name = "visible")
+    private Boolean visible;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

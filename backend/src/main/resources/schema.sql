@@ -8,9 +8,13 @@ CREATE TABLE IF NOT EXISTS project (
     github_url  VARCHAR(500),
     thumbnail_url VARCHAR(500),
     sort_order  INT DEFAULT 0,
+    visible     BOOLEAN DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 기존 DB 마이그레이션 (컬럼이 없을 때만 추가)
+ALTER TABLE project ADD COLUMN IF NOT EXISTS visible BOOLEAN DEFAULT TRUE;
 
 CREATE TABLE IF NOT EXISTS project_achievement (
     id           BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -5,11 +5,15 @@
 kyuhyeong.com 메인 사이트. 운영 중인 서비스들의 실시간 상태 + 프로젝트 소개를 한 눈에 보여주는 허브.
 자기소개 섹션 없음 — 프로젝트가 곧 자기소개.
 
-### 모니터링 대상 (3개)
+### 모니터링 대상
 
-- ITSM (Vue.js + Spring Boot)
-- Song Quiz — 노래맞추기 게임
+대시보드 노출(카드 + 프로젝트 그리드): **Song Quiz, Account** 2개.
+
+- Song Quiz — 노래맞추기 게임 (실사용자 있음)
 - Account — 가계부 (2026-07-23 KH Shop 종료로 교체)
+- ITSM — 학습용 사이트(임의 데이터 주입으로 트래픽/메모리 장애 실험). 현재 private → **잠시 숨김**
+
+ITSM 숨김: `project.visible=false`(프로젝트 카드 제외) + `application.yml` monitoring.services 에서 제외(상단 카드 제외). 컨테이너 감시(expected)에는 itsm-* 를 남겨 둔다 — 카드만 숨기고 판정은 계속. 데이터는 DB에 남긴 채 노출만 끈다.
 
 ### 도메인
 
@@ -59,6 +63,7 @@ kyuhyeong.com 메인 사이트. 운영 중인 서비스들의 실시간 상태 +
 | github_url | VARCHAR | GitHub 레포 링크 |
 | thumbnail_url | VARCHAR | 카드 썸네일 이미지 |
 | sort_order | INT | 정렬 순서 |
+| visible | BOOLEAN | 대시보드 노출 여부 (false면 목록 API에서 제외) |
 | created_at | TIMESTAMP | |
 | updated_at | TIMESTAMP | |
 
@@ -89,6 +94,8 @@ ServiceStatus: { name, projectSlug, containerName, status, dockerStatus, uptimeS
                status = UP | DOWN | MISSING | UNKNOWN  (HTTP 미사용 — responseTimeMs 없음)
 ServerMetric:  { cpuUsage, cpuCores, memoryUsed/Total, diskUsed/Total, collectedAt }
 ```
+
+**카드 순서**: `serviceStatuses` 는 `ConcurrentHashMap` 이라 `values()` 순서가 key(containerName) 해시 순서 = 뒤죽박죽. `getAll()` 은 `monitoring.services` 의 yml 정의 순서대로 재정렬해 방출한다(순서 고정).
 
 ---
 
@@ -163,10 +170,11 @@ App (React Router)
 
 ```yaml
 monitoring:
-  services:              # 화면 카드용 (3개). 판정 대상 전체가 아니다
-    - name: ITSM
-      projectSlug: itsm
-      containerName: itsm-api
+  services:              # 화면 카드용. 판정 대상 전체가 아니다
+    # ITSM 은 private/학습용 → 카드 숨김 (project.visible=false 와 함께). expected 에는 남긴다
+    # - name: ITSM
+    #   projectSlug: itsm
+    #   containerName: itsm-api
     - name: Song Quiz
       projectSlug: song-quiz
       containerName: quiz-app

@@ -1,20 +1,25 @@
 package com.kyuhyeong.dashboard.monitoring.service;
 
+import com.kyuhyeong.dashboard.monitoring.config.MonitoringProperties;
 import com.kyuhyeong.dashboard.monitoring.model.MonitoringData;
 import com.kyuhyeong.dashboard.monitoring.model.MonitoringInventory;
 import com.kyuhyeong.dashboard.monitoring.model.ServerMetric;
 import com.kyuhyeong.dashboard.monitoring.model.ServiceStatus;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@RequiredArgsConstructor
 public class MonitoringDataHolder {
+
+    private final MonitoringProperties properties;
 
     private final ConcurrentHashMap<String, ServiceStatus> serviceStatuses = new ConcurrentHashMap<>();
     private volatile ServerMetric serverMetric;
@@ -39,7 +44,12 @@ public class MonitoringDataHolder {
     }
 
     public MonitoringData getAll() {
-        List<ServiceStatus> services = new ArrayList<>(serviceStatuses.values());
+        // ConcurrentHashMap.values() 는 해시 순서라 카드 순서가 뒤죽박죽 →
+        // yml(monitoring.services) 정의 순서대로 방출해 순서를 고정한다.
+        List<ServiceStatus> services = properties.getServices().stream()
+                .map(s -> serviceStatuses.get(s.getContainerName()))
+                .filter(Objects::nonNull)
+                .toList();
         return new MonitoringData(services, serverMetric, LocalDateTime.now());
     }
 

@@ -56,9 +56,11 @@ monitoring:
   # (공개 도메인 폴링은 nginx·TLS·앱을 뭉뚱그려 "무엇이 죽었나"를 못 알려줬고,
   #  UptimeRobot 과 중복이며, 감시 대상에 자가 트래픽을 얹었다. 2026-09-05 제거)
   services:
-    - name: ITSM
-      projectSlug: itsm
-      containerName: itsm-api
+    # ITSM 은 현재 private/학습용 → 대시보드 카드에서 잠시 숨김 (project.visible=false 와 함께).
+    # 컨테이너 감시는 아래 expected 에 그대로 남겨 둔다(카드만 숨김).
+    # - name: ITSM
+    #   projectSlug: itsm
+    #   containerName: itsm-api
     - name: Song Quiz
       projectSlug: song-quiz
       containerName: quiz-app

@@ -18,7 +18,7 @@ public class ProjectController {
 
     @GetMapping
     public List<ProjectListDto> listProjects() {
-        return projectRepository.findAllByOrderBySortOrderAsc()
+        return projectRepository.findAllByVisibleTrueOrderBySortOrderAsc()
                 .stream()
                 .map(ProjectListDto::from)
                 .toList();
