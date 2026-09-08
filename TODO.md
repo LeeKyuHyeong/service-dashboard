@@ -1,50 +1,56 @@
-# Portfolio Dashboard - 개발 TODO
+# Portfolio Dashboard — 마무리 조건
 
-## Phase 1: 프로젝트 초기 설정
-- [x] Spring Boot 프로젝트 생성 (Gradle, Java 17)
-- [x] 의존성 추가: Spring Web, Spring Data JPA, MariaDB, OSHI, Docker Java
-- [x] application.yml 설정 (DB, 모니터링 서비스 매핑)
-- [x] React 프론트엔드 프로젝트 생성 (Vite)
-- [x] 프론트엔드 의존성: Zustand, Recharts, React Router
+기능 체크리스트(Phase 1~8)는 2026-04 에 전부 끝났다. 그 뒤의 커밋은 전부 운영 중 드러난
+문제의 수정이다. 그래서 이 프로젝트의 "마무리"는 기능 목록이 아니라 아래 한 문장으로 정의한다.
 
-## Phase 2: Backend - 도메인 & DB
-- [x] Project 엔티티 + Repository
-- [x] ProjectAchievement 엔티티 + Repository
-- [x] DB 스키마 초기화 (schema.sql / data.sql)
+> **외부 사건(새 프로젝트 추가, 감시 대상 앱의 컨테이너 이름 변경 등)이 없으면
+> 내가 손대지 않아도 되는 상태.**
 
-## Phase 3: Backend - 프로젝트 API
-- [x] GET /api/projects — 프로젝트 목록
-- [x] GET /api/projects/{slug} — 프로젝트 상세 + achievements
+"상용 모니터링에 있는데 여기엔 없는 것"(시계열 저장, 알림 라우팅·억제, 다중 신호 판정,
+flapping 억제, 자동 발견 등)은 마무리 조건이 **아니다**. 그 방향은 끝이 없다.
+청중은 둘 — 방문자(채용 담당자 등)와 운영자(본인). 각각에게 약속한 것을 거짓 없이 보여주면 끝.
 
-## Phase 4: Backend - 모니터링
-- [x] ServiceStatus / ServerMetric 모델 (인메모리)
-- [x] MonitoringProperties (yaml 매핑)
-- [x] HealthCheckService — HTTP health check + Docker 상태 수집
-- [x] ServerMetricService — OSHI로 CPU/Memory/Disk 수집
-- [x] MonitoringScheduler — 10초 주기 스케줄러
-- [x] SSE /api/monitoring/stream 엔드포인트
-- [x] GET /api/monitoring/logs/{containerName} 엔드포인트
+---
 
-## Phase 5: Frontend - 기본 구조
-- [x] React Router 설정 (/, /projects/:slug)
-- [x] useMonitoringStore (Zustand)
-- [x] useSSE 커스텀 훅
-- [x] API 호출 유틸
+## 방문자 관점 — 설명 없이 이해되는가
 
-## Phase 6: Frontend - 메인 페이지
-- [x] ServiceCard 컴포넌트 (UP/DOWN, 응답시간, Docker 상태, 업타임)
-- [x] MetricCard 컴포넌트 (CPU, Memory, Disk + Recharts)
-- [x] ProjectCard 컴포넌트 (썸네일, 이름, 설명, 태그)
-- [x] LogModal 컴포넌트
-- [x] MainPage 조합
+- [ ] 첫 화면의 UP 뱃지·Docker 상태·가동시간이 무엇을 뜻하는지 방문자가 묻지 않아도 된다
+      (툴팁 한 줄이든 범례든, 방법은 자유)
+- [ ] 두 프로젝트(Song Quiz, Account)의 상세 페이지 성과 항목이 실제 내용으로 채워져 있다
+      (seed 는 채워져 있음 — **운영 DB** 기준으로 확인할 것. 운영 데이터의 주인은 DB)
+- [ ] demo / GitHub 링크가 전부 살아 있다 (운영 DB 기준)
+- [ ] 리포에 **방문자용 README** 가 있다. CLAUDE.md 는 운영 메모라 그 역할을 못 한다
+- [ ] ITSM 의 "잠시 숨김" 을 끝낸다 — 공개하거나, 영구 제외로 결정하고 문서에서 "잠시" 를 지운다
 
-## Phase 7: Frontend - 상세 페이지
-- [x] ProjectHeader 컴포넌트
-- [x] TechStackTags 컴포넌트
-- [x] AchievementCard 컴포넌트
-- [x] ProjectDetailPage 조합
+## 운영자 관점 — 개입 없이 믿을 수 있는가
 
-## Phase 8: 빌드 & 배포
-- [x] Frontend 빌드 → Spring Boot static 리소스로 통합
-- [x] Dockerfile 작성
-- [x] docker-compose.yml 작성
+- [ ] **4주 연속** 거짓 알림도, 놓친 장애도 없었다 (기간을 채우는 것이 조건 — 코드 변경이 아님.
+      전례: 6주간 10초 폴링, quiz 이름 변경으로 감시 상실)
+- [ ] 전이가 로그에만 남는 상태를 끝낸다 — 알림 채널 **1개**(텔레그램·메일 등)를 붙인다.
+      `TransitionService` 의 "알림(1-4)" 은 아직 소비자가 없다
+- [ ] UptimeRobot 이 `/api/monitoring/health/self` 를 실제로 보고 있고, 503(루프 정지)과
+      500(판정 불가)이 구분되어 도착하는 것을 **한 번 실제로 확인**한다
+
+## 코드·문서 관점 — 미결 항목이 남아 있지 않은가
+
+- [x] 판정 규칙에 단위 테스트가 있다 — 그룹 해석 5건(`HealthCheckServiceGroupTest`),
+      전이 8건(`TransitionServiceTest`). 사고가 났던 곳은 덮였다
+- [ ] 문서 속 미결 문구를 하나씩 **결정**한다. 하기로 하면 하고, 안 하기로 하면
+      "안 한다, 이유는 이것" 으로 바꾼다. 미결 상태로 남기는 것이 마무리를 막는 진짜 원인
+  - [ ] "HTTP 판정은 Actuator 도입 후 내부 경로로 재도입한다" (CLAUDE.md, HealthCheckService)
+  - [ ] "앱 레벨 인증 분리는 2단계" (CLAUDE.md, MonitoringController)
+  - [ ] `ignored` 의 house-app "추후 구축 예정" (application.yml)
+- [ ] CLAUDE.md 가 현재 코드와 어긋난 곳이 없다 (2026-09-08 확인: "테스트 코드 없음" 문구가
+      낡아 있었음 → 수정)
+
+---
+
+## 완료 판정
+
+세 줄이 전부 참이면 마무리다.
+
+1. 방문자가 설명 없이 이해한다
+2. 운영자가 4주간 개입 없이 믿을 수 있다
+3. 리포에 미결 항목이 남아 있지 않다
+
+지금 가장 부족한 것: **알림 채널 부재**. 가장 쉬운 것: **미결 문구 정리**.

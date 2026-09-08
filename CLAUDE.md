@@ -63,7 +63,7 @@ npm run lint      # eslint
 # 백엔드 — backend/
 ./gradlew build   # 컴파일(+테스트)
 ./gradlew bootJar # 실행 jar → build/libs/*.jar
-./gradlew test    # 테스트 (⚠️ 현재 테스트 코드 없음)
+./gradlew test    # 테스트 — 판정 규칙 단위 테스트(그룹 해석 · 전이) 13건
 ```
 
 ### 배포 (CI/CD)
