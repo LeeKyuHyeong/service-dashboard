@@ -13,7 +13,7 @@ kyuhyeong.com 메인 사이트. 운영 중인 서비스들의 실시간 상태 +
 
 대시보드 노출(카드 + 프로젝트 그리드): **Song Quiz, Account** 2개.
 
-- Song Quiz — 노래맞추기 게임 (실사용자 있음)
+- Song Quiz — 노래맞추기 게임 (실사용자 있음). blue-green 무중단 배포 → 컨테이너는 `quiz-app-blue`/`quiz-app-green` 두 벌, 감시는 논리 이름 `quiz-app` 그룹으로 한다
 - Account — 가계부 (2026-07-23 KH Shop 종료로 교체)
 - ITSM — 학습용 사이트(임의 데이터 주입으로 트래픽/메모리 장애 실험). 현재 private → **잠시 숨김**
 
@@ -226,7 +226,7 @@ monitoring:
   expected:              # 판정 대상 전체 (11개). DB 카드는 안 그리지만 DB가 죽은 건 알아야 한다
     - dashboard-app
     - dashboard-db
-    - quiz-app
+    - quiz-app           # 실제 컨테이너가 아니라 blue-green 그룹의 논리 이름 (아래 groups)
     - quiz-db
     - itsm-api
     - itsm-batch
@@ -235,11 +235,39 @@ monitoring:
     - itsm-fail2ban
     - account-api
     - account-db
+  groups:                # 논리 이름 -> 실제 컨테이너 후보 (blue-green 무중단 배포)
+    quiz-app:
+      - quiz-app-blue
+      - quiz-app-green
   ignored:               # 의도적 제외 — 사유를 반드시 주석으로 남긴다
     - house-app          # 청약 관련 웹사이트, 추후 구축 예정 — 2026-09-04 down
     - house-db
   checkIntervalSeconds: 60
 ```
+
+### 컨테이너 그룹 (blue-green 무중단 배포)
+
+quiz 는 2026-09-08 무중단 배포 도입으로 `quiz-app` 이 사라지고 `quiz-app-blue`/`quiz-app-green`
+두 벌이 됐다. **평시에 한 색만 running 이고 나머지 색은 `Exited(137)` 로 남는 것이 정상 상태**다.
+이름이 바뀐 것만으로 감시는 대상을 잃었고, 서비스는 멀쩡한데 카드는 `MISSING`/`none` 이 됐다
+(판정 규칙은 정상 동작했다 — 설정이 현실과 어긋난 것).
+
+- `services`/`expected` 에는 **논리 이름**(`quiz-app`)만 쓴다. 배포로 활성 색이 바뀌어도
+  설정도 전이 로그도 흔들리지 않는다.
+- **멤버 이름(`quiz-app-blue` 등)을 `expected` 에 직접 넣지 말 것** — 대기 색이 영구 DOWN 으로
+  잡혀 이상 판정이 상시 켜진다. 기동 로그가 이 실수를 경고한다.
+- 판정: 멤버 중 **하나라도 running 이면 UP** / 다 있는데 아무도 안 돌면 DOWN / 하나도 없으면 MISSING.
+- 대표 컨테이너: running 우선, 동률이면 **최근 기동** 쪽. 드레인 30초 동안 두 색이 같이 떠 있는데,
+  워크플로가 nginx upstream 을 먼저 전환하고 구 색을 나중에 정지하므로 그때 트래픽을 받는 쪽은
+  새 색이다. 활성 색의 진짜 근거는 `/etc/nginx/conf.d/quiz-upstream.conf` 지만 **다른 컨테이너의
+  파일이라 대시보드가 읽을 수 없다** — 기동 시각이 최선의 근사다.
+- `ServiceStatus.containerName` 은 **해석된 실제 이름**(`quiz-app-green`)을 담는다. 논리 이름을
+  그대로 내보내면 `docker logs quiz-app` 이 실패해 로그 버튼이 깨진다.
+- unexpected 비교는 그룹을 멤버로 펼쳐서 한다. 안 펼치면 활성 색이 매번 "목록에 없는데 실행 중"
+  으로 잘못 경고된다.
+
+> **감시 대상 앱이 컨테이너 이름을 바꾸면 이 대시보드의 설정도 같이 바꿔야 한다.**
+> 앱 리포의 배포 방식 변경(blue-green 도입 등)은 대시보드 입장에서 조용한 감시 상실이다.
 
 ### ⚠️ 설정 키 바인딩 규칙
 

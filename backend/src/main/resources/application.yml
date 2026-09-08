@@ -68,6 +68,7 @@ monitoring:
       projectSlug: account
       containerName: account-api
   # 판정 대상 전체(11개, 2026-09-05 docker ps -a 실측 기준).
+  # quiz-app 은 실제 컨테이너가 아니라 blue-green 그룹의 논리 이름이다(아래 groups).
   # 화면 카드(services)와 다른 목록이다 — DB 카드를 그릴 이유는 없지만 DB가 죽은 건 알아야 한다.
   expected:
     - dashboard-app
@@ -81,6 +82,16 @@ monitoring:
     - itsm-fail2ban
     - account-api
     - account-db
+  # 논리 이름 → 실제 컨테이너 후보. blue-green 무중단 배포 대응 (2026-09-08).
+  # quiz 는 배포 때마다 활성 색이 바뀌고 대기 색은 Exited 로 남는다 — 그것이 정상 상태다.
+  # 멤버를 expected 에 직접 넣으면 대기 색이 영구 DOWN 으로 잡히므로, 논리 이름 quiz-app 하나만
+  # services/expected 에 두고 여기서 멤버로 편다. 멤버 중 하나라도 running 이면 UP.
+  # 활성 색 판별의 진짜 근거는 nginx /etc/nginx/conf.d/quiz-upstream.conf 지만 다른 컨테이너의
+  # 파일이라 읽을 수 없다 — running 우선 + 최근 기동 순으로 대표 컨테이너를 고른다.
+  groups:
+    quiz-app:
+      - quiz-app-blue
+      - quiz-app-green
   # 의도적 제외. 실행 중이어도 unexpected 경고를 내지 않는다. 사유를 반드시 남길 것.
   ignored:
     - house-app     # 청약 관련 웹사이트, 추후 구축 예정 — 2026-09-04 down

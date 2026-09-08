@@ -14,8 +14,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * 판정은 <b>컨테이너 상태 단일</b>이다. HTTP 폴링은 쓰지 않는다.
@@ -52,6 +55,17 @@ public class HealthCheckService {
                 .map(MonitoringProperties.ServiceConfig::getContainerName)
                 .filter(n -> !expected.contains(n))
                 .forEach(n -> log.warn("화면 카드 컨테이너 {} 가 monitoring.expected 에 없다 — 카드는 뜨지만 이상 감지는 안 된다", n));
+
+        // 그룹은 논리 이름으로만 감시한다. 멤버 이름이 expected 에 직접 들어가면
+        // 대기 색(정상적으로 Exited)이 영구 DOWN 으로 잡혀 이상 판정이 상시 켜진다.
+        monitoringProperties.getGroups().forEach((logical, members) -> {
+            log.info("컨테이너 그룹 {} = {} (하나라도 running 이면 UP)", logical, members);
+            if (!expected.contains(logical)) {
+                log.warn("그룹 {} 의 논리 이름이 monitoring.expected 에 없다 — 그룹 전체가 감시에서 빠진다", logical);
+            }
+            members.stream().filter(expected::contains).forEach(m ->
+                    log.warn("그룹 멤버 {} 가 monitoring.expected 에 직접 들어 있다 — 대기 색이 영구 DOWN 으로 보인다. 논리 이름 {} 만 남길 것", m, logical));
+        });
     }
 
     /** 컨테이너 1건의 실측 상태. */
@@ -96,19 +110,19 @@ public class HealthCheckService {
 
         Map<String, String> expectedStates = new LinkedHashMap<>();
         for (String name : monitoringProperties.getExpected()) {
-            ContainerState state = snapshot.byName().get(name);
-            if (state == null) {
-                expectedStates.put(name, "MISSING");
-            } else {
-                expectedStates.put(name, "running".equals(state.dockerStatus()) ? "UP" : "DOWN");
-            }
+            // 그룹이면 멤버 중 하나라도 running 이어야 UP. 대기 색이 Exited 인 것은 이상이 아니다.
+            expectedStates.put(name, resolve(name, snapshot)
+                    .map(state -> "running".equals(state.dockerStatus()) ? "UP" : "DOWN")
+                    .orElse("MISSING"));
         }
 
         // 실행 중인 것만 본다. 멈춰 있는 낯선 컨테이너까지 경고하면 잔재만으로 시끄러워진다.
+        // 그룹은 멤버로 펼쳐서 비교한다 — 논리 이름만 대조하면 활성 색이 매번 unexpected 로 잡힌다.
+        Set<String> watched = monitoringProperties.watchedContainerNames();
         List<String> unexpected = snapshot.byName().values().stream()
                 .filter(c -> "running".equals(c.dockerStatus()))
                 .map(ContainerState::name)
-                .filter(n -> !monitoringProperties.getExpected().contains(n))
+                .filter(n -> !watched.contains(n))
                 .filter(n -> !monitoringProperties.getIgnored().contains(n))
                 .sorted()
                 .toList();
@@ -158,20 +172,43 @@ public class HealthCheckService {
         return new DockerSnapshot(true, byName);
     }
 
+    /**
+     * 논리 이름 하나를 <b>대표 컨테이너 1건</b>으로 접는다.
+     * <ol>
+     *   <li>running 인 멤버 우선. 둘 다 떠 있는 순간(배포 중 드레인 30초)은 <b>최근 기동</b>
+     *       쪽을 고른다 — 워크플로가 nginx upstream 을 먼저 전환하고 구 색을 나중에 정지하므로
+     *       그때 트래픽을 받는 쪽은 새 색이다. (활성 색의 진짜 근거는 nginx upstream 파일인데
+     *       그건 다른 컨테이너의 파일이라 여기서 읽을 수 없다 — 기동 시각이 최선의 근사다.)</li>
+     *   <li>running 이 없으면 존재하는 멤버 중 최근 기동 쪽 — 상태는 DOWN 이 된다.</li>
+     *   <li>멤버가 하나도 없으면 empty — MISSING 이다.</li>
+     * </ol>
+     */
+    private Optional<ContainerState> resolve(String logicalName, DockerSnapshot snapshot) {
+        return monitoringProperties.membersOf(logicalName).stream()
+                .map(snapshot.byName()::get)
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator
+                        .comparing((ContainerState c) -> "running".equals(c.dockerStatus()))
+                        .thenComparing(c -> c.startedAt() == null ? Instant.EPOCH : c.startedAt()));
+    }
+
     private ServiceStatus toStatus(MonitoringProperties.ServiceConfig service, DockerSnapshot snapshot) {
         String status;
         String dockerStatus;
         long uptimeSeconds = 0;
+        // 로그 조회는 실제 컨테이너 이름이라야 통한다. 논리 이름(quiz-app)으로는 docker logs 가 실패한다.
+        String actualName = service.getContainerName();
 
         if (!snapshot.available()) {
             status = "UNKNOWN";          // 판정 불가. UP 으로도 DOWN 으로도 위장하지 않는다
             dockerStatus = "unknown";
         } else {
-            ContainerState state = snapshot.byName().get(service.getContainerName());
+            ContainerState state = resolve(service.getContainerName(), snapshot).orElse(null);
             if (state == null) {
                 status = "MISSING";      // 조회는 됐는데 없다 = 컨테이너가 삭제됐다
                 dockerStatus = "none";
             } else {
+                actualName = state.name();
                 dockerStatus = state.dockerStatus();
                 status = "running".equals(dockerStatus) ? "UP" : "DOWN";
                 if (state.startedAt() != null) {
@@ -184,7 +221,7 @@ public class HealthCheckService {
         return ServiceStatus.builder()
                 .name(service.getName())
                 .projectSlug(service.getProjectSlug())
-                .containerName(service.getContainerName())
+                .containerName(actualName)
                 .status(status)
                 .dockerStatus(dockerStatus)
                 .uptimeSeconds(uptimeSeconds)
